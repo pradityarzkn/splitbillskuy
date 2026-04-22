@@ -52,7 +52,7 @@ export default function App() {
   // ---- Submit ----
   const handleSubmit = async () => {
     try {
-      const res = await axios.post("http://localhost:3001/calculate", {
+      const res = await axios.post("https://splitbillskuy-api.onrender.com", {
         paidBy,
         tax: Number(tax || 0),
         service: Number(service || 0),
