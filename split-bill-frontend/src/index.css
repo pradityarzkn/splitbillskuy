@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* custom reusable class */
+.input {
+  @apply border p-2 rounded w-full;
+}
+
+.btn-blue {
+  @apply bg-blue-500 text-white px-3 py-1 rounded;
+}
+
+.btn-green {
+  @apply bg-green-500 text-white px-3 py-1 rounded;
+}
+
+.btn-purple {
+  @apply bg-purple-500 text-white px-3 py-1 rounded;
+}
