@@ -2,11 +2,14 @@ const express = require("express")
 const cors = require("cors")
 
 const app = express()
-const PORT = 3001
+
+// ✅ FIX WAJIB buat deploy
+const PORT = process.env.PORT || 3001
 
 app.use(cors())
 app.use(express.json())
 
+// health check
 app.get("/", (req, res) => {
   res.send("Split Bill API FINAL 🚀")
 })
@@ -24,17 +27,19 @@ app.post("/calculate", (req, res) => {
   // 1. map menu
   const menuMap = {}
   menu.forEach(m => {
-    menuMap[m.name] = m.price
+    if (m.name) {
+      menuMap[m.name] = Number(m.price || 0)
+    }
   })
 
   // 2. subtotal per orang
   const personSubtotal = {}
   let subtotal = 0
 
-  orders.forEach(o => {
+  for (const o of orders) {
     const price = menuMap[o.menu]
 
-    if (!price) {
+    if (price === undefined) {
       return res.status(400).json({
         error: `Menu ${o.menu} tidak ditemukan`
       })
@@ -48,7 +53,14 @@ app.post("/calculate", (req, res) => {
 
     personSubtotal[o.person] += amount
     subtotal += amount
-  })
+  }
+
+  // edge case: kosong
+  if (subtotal === 0) {
+    return res.status(400).json({
+      error: "Subtotal tidak boleh 0"
+    })
+  }
 
   // 3. hitung tax & service
   const taxAmount = subtotal * (tax / 100)
@@ -62,7 +74,7 @@ app.post("/calculate", (req, res) => {
     balances[p] = 0
   })
 
-  // 5. distribusi biaya (include tax & service)
+  // 5. distribusi biaya
   Object.keys(personSubtotal).forEach(p => {
     const ratio = personSubtotal[p] / subtotal
 
@@ -94,7 +106,8 @@ app.post("/calculate", (req, res) => {
   // 8. settlement
   const transfers = []
 
-  let i = 0, j = 0
+  let i = 0
+  let j = 0
 
   while (i < debtors.length && j < creditors.length) {
     const d = debtors[i]
@@ -126,5 +139,5 @@ app.post("/calculate", (req, res) => {
 })
 
 app.listen(PORT, () => {
-  console.log(`Server jalan di http://localhost:${PORT}`)
+  console.log(`Server jalan di port ${PORT}`)
 })
