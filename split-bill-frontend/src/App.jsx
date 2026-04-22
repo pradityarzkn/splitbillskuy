@@ -28,7 +28,7 @@ export default function App() {
   const addMenu = () => setMenu([...menu, { name: "", price: "" }])
   const updateMenu = (i, field, val) => {
     const copy = [...menu]
-    copy[i][field] = field === "price" ? val : val
+    copy[i][field] = val
     setMenu(copy)
   }
 
@@ -52,16 +52,19 @@ export default function App() {
   // ---- Submit ----
   const handleSubmit = async () => {
     try {
-      const res = await axios.post("https://splitbillskuy-api.onrender.com/calculate", {
-        paidBy,
-        tax: Number(tax || 0),
-        service: Number(service || 0),
-        menu: menu.map(m => ({
-          name: m.name,
-          price: Number(m.price.toString().replace(/\./g, "") || 0)
-        })),
-        orders
-      })
+      const res = await axios.post(
+        "https://splitbillskuy-api.onrender.com/calculate",
+        {
+          paidBy,
+          tax: Number(tax || 0),
+          service: Number(service || 0),
+          menu: menu.map(m => ({
+            name: m.name,
+            price: Number((m.price || "0").toString().replace(/\./g, ""))
+          })),
+          orders
+        }
+      )
       setResult(res.data)
     } catch (err) {
       alert("Error: " + err.message)
@@ -127,17 +130,18 @@ export default function App() {
                   placeholder="Nama menu"
                   onChange={(e) => updateMenu(i, "name", e.target.value)}
                 />
+
                 <input
                   className="input w-1/2"
                   type="text"
                   value={formatNumber(m.price)}
                   placeholder="Harga"
-                  onChange={(e) => {(e) => {
+                  onChange={(e) => {
                     const raw = unformatNumber(e.target.value)
                     if (!isNaN(raw)) {
                       updateMenu(i, "price", raw)
                     }
-                 }}
+                  }}
                 />
               </div>
             ))}
