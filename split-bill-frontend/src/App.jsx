@@ -10,13 +10,27 @@ export default function App() {
   const [service, setService] = useState("")
   const [result, setResult] = useState(null)
 
+  // ======================
+  // FORMAT ANGKA (1.000)
+  // ======================
+  const formatNumber = (value) => {
+    if (!value) return ""
+    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+  }
+
+  const unformatNumber = (value) => {
+    return value.replace(/\./g, "")
+  }
+
   const formatRupiah = (num) =>
     new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR"
     }).format(num)
 
-  // ---- People ----
+  // ======================
+  // PEOPLE
+  // ======================
   const addPerson = () => setPeople([...people, ""])
   const updatePerson = (i, val) => {
     const copy = [...people]
@@ -24,15 +38,20 @@ export default function App() {
     setPeople(copy)
   }
 
-  // ---- Menu ----
+  // ======================
+  // MENU
+  // ======================
   const addMenu = () => setMenu([...menu, { name: "", price: "" }])
+
   const updateMenu = (i, field, val) => {
     const copy = [...menu]
-    copy[i][field] = field === "price" ? val : val
+    copy[i][field] = val
     setMenu(copy)
   }
 
-  // ---- Orders ----
+  // ======================
+  // ORDERS
+  // ======================
   const addOrder = () =>
     setOrders([
       ...orders,
@@ -49,19 +68,24 @@ export default function App() {
     setOrders(copy)
   }
 
-  // ---- Submit ----
+  // ======================
+  // SUBMIT
+  // ======================
   const handleSubmit = async () => {
     try {
-      const res = await axios.post("https://splitbillskuy-api.onrender.com/calculate", {
-        paidBy,
-        tax: Number(tax || 0),
-        service: Number(service || 0),
-        menu: menu.map(m => ({
-          name: m.name,
-          price: Number(m.price || 0)
-        })),
-        orders
-      })
+      const res = await axios.post(
+        "https://splitbillskuy-api.onrender.com/calculate",
+        {
+          paidBy,
+          tax: Number(tax || 0),
+          service: Number(service || 0),
+          menu: menu.map(m => ({
+            name: m.name,
+            price: Number(unformatNumber(m.price.toString()) || 0)
+          })),
+          orders
+        }
+      )
       setResult(res.data)
     } catch (err) {
       alert("Error: " + err.message)
@@ -71,28 +95,14 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-100">
 
-      {/* HEADER */}
-      <div className="bg-black text-white text-center py-4 text-xl font-semibold shadow">
-        Split Bill App 💸
+      <div className="bg-black text-white text-center py-4 text-xl font-semibold">
+        SplitBillskuy 💸
       </div>
 
       <div className="max-w-6xl mx-auto p-6 grid md:grid-cols-2 gap-6">
 
         {/* LEFT */}
         <div className="space-y-6">
-
-          <Card title="Siapa yang bayar?">
-            <select
-              className="input"
-              value={paidBy}
-              onChange={(e) => setPaidBy(e.target.value)}
-            >
-              <option value="">-- pilih --</option>
-              {people.filter(p => p).map((p, i) => (
-                <option key={i}>{p}</option>
-              ))}
-            </select>
-          </Card>
 
           <Card title="People">
             {people.map((p, i) => (
@@ -118,12 +128,18 @@ export default function App() {
                   placeholder="Nama menu"
                   onChange={(e) => updateMenu(i, "name", e.target.value)}
                 />
+
                 <input
                   className="input w-1/2"
-                  type="number"
-                  value={m.price}
+                  type="text"
+                  value={formatNumber(m.price)}
                   placeholder="Harga"
-                  onChange={(e) => updateMenu(i, "price", e.target.value)}
+                  onChange={(e) => {
+                    const raw = unformatNumber(e.target.value)
+                    if (!isNaN(raw)) {
+                      updateMenu(i, "price", raw)
+                    }
+                  }}
                 />
               </div>
             ))}
@@ -176,7 +192,7 @@ export default function App() {
         {/* RIGHT */}
         <div className="space-y-6">
 
-          <Card title="Tax & Service">
+          <Card title="Tax & Service (opsional)">
             <div className="flex gap-2">
               <input
                 className="input w-1/2"
@@ -197,23 +213,21 @@ export default function App() {
 
           <button
             onClick={handleSubmit}
-            className="w-full bg-black text-white py-3 rounded-xl font-semibold text-lg hover:opacity-90"
+            className="w-full bg-black text-white py-3 rounded-xl font-semibold"
           >
             Calculate 💸
           </button>
 
           {result && (
             <div className="bg-white p-6 rounded-xl shadow">
-              <h2 className="text-lg font-bold mb-3">Hasil</h2>
+              <h2 className="font-bold mb-3">Hasil</h2>
 
-              <p className="mb-2">
-                Total: <b>{formatRupiah(result.total)}</b>
-              </p>
+              <p>Total: {formatRupiah(result.total)}</p>
 
-              <div className="space-y-2">
+              <div className="mt-3 space-y-2">
                 {result.transfers.map((t, i) => (
                   <div key={i} className="bg-gray-100 p-2 rounded">
-                    {t.from} ➜ {t.to} :{" "}
+                    {t.from} → {t.to} :{" "}
                     <b>{formatRupiah(t.amount)}</b>
                   </div>
                 ))}
