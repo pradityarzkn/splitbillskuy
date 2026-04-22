@@ -137,7 +137,7 @@ export default function App() {
                     if (!isNaN(raw)) {
                       updateMenu(i, "price", raw)
                     }
-                  }}
+                 }}
                 />
               </div>
             ))}
