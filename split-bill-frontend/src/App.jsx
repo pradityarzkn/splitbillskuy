@@ -58,7 +58,7 @@ export default function App() {
         service: Number(service || 0),
         menu: menu.map(m => ({
           name: m.name,
-          price: Number(m.price || 0)
+          price: Number(m.price.toString().replace(/\./g, "") || 0)
         })),
         orders
       })
@@ -66,6 +66,15 @@ export default function App() {
     } catch (err) {
       alert("Error: " + err.message)
     }
+  }
+
+  const formatNumber = (value) => {
+    if (!value) return ""
+    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+  }
+
+  const unformatNumber = (value) => {
+    return value.replace(/\./g, "")
   }
 
   return (
@@ -120,10 +129,15 @@ export default function App() {
                 />
                 <input
                   className="input w-1/2"
-                  type="number"
-                  value={m.price}
+                  type="text"
+                  value={formatNumber(m.price)}
                   placeholder="Harga"
-                  onChange={(e) => updateMenu(i, "price", e.target.value)}
+                  onChange={(e) => {(e) => {
+                    const raw = unformatNumber(e.target.value)
+                    if (!isNaN(raw)) {
+                      updateMenu(i, "price", raw)
+                    }
+                  }}
                 />
               </div>
             ))}
