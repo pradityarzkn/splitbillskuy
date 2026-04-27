@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import axios from "axios"
 
 export default function App() {
@@ -9,12 +9,28 @@ export default function App() {
   const [tax, setTax] = useState("")
   const [service, setService] = useState("")
   const [result, setResult] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  // lock scroll pas loading
+  useEffect(() => {
+    document.body.style.overflow = loading ? "hidden" : "auto"
+  }, [loading])
 
   const formatRupiah = (num) =>
     new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR"
     }).format(num)
+
+  // ===== FORMAT ANGKA =====
+  const formatNumber = (value) => {
+    if (!value) return ""
+    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+  }
+
+  const unformatNumber = (value) => {
+    return value.replace(/\./g, "")
+  }
 
   // ---- People ----
   const addPerson = () => setPeople([...people, ""])
@@ -52,6 +68,8 @@ export default function App() {
   // ---- Submit ----
   const handleSubmit = async () => {
     try {
+      setLoading(true)
+
       const res = await axios.post(
         "https://splitbillskuy-api.onrender.com/calculate",
         {
@@ -60,32 +78,28 @@ export default function App() {
           service: Number(service || 0),
           menu: menu.map(m => ({
             name: m.name,
-            price: Number((m.price || "0").toString().replace(/\./g, ""))
+            price: Number(unformatNumber((m.price || "0").toString()))
           })),
           orders
         }
       )
+
       setResult(res.data)
     } catch (err) {
       alert("Error: " + err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
-  const formatNumber = (value) => {
-    if (!value) return ""
-    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")
-  }
-
-  const unformatNumber = (value) => {
-    return value.replace(/\./g, "")
-  }
+  const validPeople = people.filter(p => p && p.trim() !== "")
 
   return (
     <div className="min-h-screen bg-gray-100">
 
       {/* HEADER */}
       <div className="bg-black text-white text-center py-4 text-xl font-semibold shadow">
-        Split Bill App 💸
+        SplitBillskuy 💸
       </div>
 
       <div className="max-w-6xl mx-auto p-6 grid md:grid-cols-2 gap-6">
@@ -100,8 +114,10 @@ export default function App() {
               onChange={(e) => setPaidBy(e.target.value)}
             >
               <option value="">-- pilih --</option>
-              {people.filter(p => p).map((p, i) => (
-                <option key={i}>{p}</option>
+              {validPeople.map((p, i) => (
+                <option key={i} value={p}>
+                  {p}
+                </option>
               ))}
             </select>
           </Card>
@@ -159,7 +175,7 @@ export default function App() {
                   onChange={(e) => updateOrder(i, "person", e.target.value)}
                 >
                   <option value="">-- pilih --</option>
-                  {people.filter(p => p).map((p, idx) => (
+                  {validPeople.map((p, idx) => (
                     <option key={idx}>{p}</option>
                   ))}
                 </select>
@@ -194,7 +210,7 @@ export default function App() {
         {/* RIGHT */}
         <div className="space-y-6">
 
-          <Card title="Tax & Service">
+          <Card title="Tax & Service (opsional)">
             <div className="flex gap-2">
               <input
                 className="input w-1/2"
@@ -215,9 +231,10 @@ export default function App() {
 
           <button
             onClick={handleSubmit}
-            className="w-full bg-black text-white py-3 rounded-xl font-semibold text-lg hover:opacity-90"
+            disabled={loading || !paidBy}
+            className="w-full bg-black text-white py-3 rounded-xl font-semibold text-lg disabled:opacity-50"
           >
-            Calculate 💸
+            {loading ? "Calculating..." : "Calculate 💸"}
           </button>
 
           {result && (
@@ -241,11 +258,20 @@ export default function App() {
 
         </div>
       </div>
+
+      {/* 🔥 LOADING OVERLAY */}
+      {loading && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white px-6 py-4 rounded-xl shadow flex items-center gap-3">
+            <div className="w-6 h-6 border-4 border-gray-300 border-t-black rounded-full animate-spin"></div>
+            <span className="font-medium">Menghitung...</span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-// reusable card
 function Card({ title, children }) {
   return (
     <div className="bg-white p-4 rounded-xl shadow">
