@@ -79,7 +79,7 @@ export default function App() {
 
     menu.forEach(m => {
       if (m.name) {
-        menuMap[m.name] = Number(unformatNumber(m.price || "0"))
+        menuMap[m.name.trim()] = Number(unformatNumber(m.price || "0"))
       }
     })
 
@@ -88,15 +88,18 @@ export default function App() {
     orders.forEach(o => {
       if (!o.person || !o.menu) return
 
-      if (!result[o.person]) {
-        result[o.person] = { items: [], total: 0 }
+      const person = o.person.trim()
+      const menuName = o.menu.trim()
+
+      if (!result[person]) {
+        result[person] = { items: [], total: 0 }
       }
 
-      const price = menuMap[o.menu] || 0
+      const price = menuMap[menuName] || 0
       const subtotal = price * o.qty
 
-      result[o.person].items.push(`${o.menu} x${o.qty}`)
-      result[o.person].total += subtotal
+      result[person].items.push(`${menuName} x${o.qty}`)
+      result[person].total += subtotal
     })
 
     return result
@@ -104,34 +107,60 @@ export default function App() {
 
   const detail = useMemo(() => getDetailPerPerson(), [orders, menu])
 
-  // ===== SUBMIT =====
+  const validPeople = people.filter(p => p && p.trim() !== "")
+
+  // ===== SUBMIT (🔥 FIX DISINI) =====
   const handleSubmit = async () => {
     try {
       setLoading(true)
 
+      const cleanMenu = menu.filter(m => m.name && m.price)
+      const cleanOrders = orders.filter(o => o.person && o.menu)
+
+      if (!paidBy) {
+        alert("Pilih siapa yang bayar")
+        return
+      }
+
+      if (cleanMenu.length === 0) {
+        alert("Menu belum diisi")
+        return
+      }
+
+      if (cleanOrders.length === 0) {
+        alert("Order belum diisi")
+        return
+      }
+
       const res = await axios.post(
         "https://splitbillskuy-api.onrender.com/calculate",
         {
-          paidBy,
+          paidBy: paidBy.trim(),
           tax: Number(tax || 0),
           service: Number(service || 0),
-          menu: menu.map(m => ({
-            name: m.name,
-            price: Number(unformatNumber((m.price || "0").toString()))
+
+          menu: cleanMenu.map(m => ({
+            name: m.name.trim(),
+            price: Number(unformatNumber(m.price.toString()))
           })),
-          orders
+
+          orders: cleanOrders.map(o => ({
+            ...o,
+            person: o.person.trim(),
+            menu: o.menu.trim()
+          }))
         }
       )
 
       setResult(res.data)
+
     } catch (err) {
-      alert("Error: " + err.message)
+      console.log("ERROR BACKEND:", err.response?.data)
+      alert(err.response?.data?.error || err.message)
     } finally {
       setLoading(false)
     }
   }
-
-  const validPeople = people.filter(p => p && p.trim() !== "")
 
   // ===== EXPORT =====
   const handleExport = async () => {
@@ -143,7 +172,7 @@ export default function App() {
     })
 
     const link = document.createElement("a")
-    link.download = "splitbill.png"
+    link.download = `splitbill-${Date.now()}.png`
     link.href = canvas.toDataURL()
     link.click()
   }
@@ -151,7 +180,6 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-100">
 
-      {/* HEADER */}
       <div className="bg-black text-white text-center py-4 text-xl font-semibold shadow">
         SplitBillskuy 💸
       </div>
@@ -173,40 +201,49 @@ export default function App() {
           <Card title="People">
             {people.map((p, i) => (
               <div key={i} className="flex gap-2 mb-2">
-                <input
-                  className="input flex-1"
-                  value={p}
+                <input className="input flex-1" value={p}
                   placeholder="Nama"
                   onChange={(e) => updatePerson(i, e.target.value)}
                 />
-                <button onClick={() => removePerson(i)} className="bg-red-500 text-white px-3 rounded">
+                <button onClick={() => removePerson(i)}
+                  className="bg-red-500 text-white px-3 rounded">
                   ✕
                 </button>
               </div>
             ))}
-            <button className="btn-blue" onClick={addPerson}>+ Tambah Orang</button>
+            <button className="btn-blue" onClick={addPerson}>
+              + Tambah Orang
+            </button>
           </Card>
 
           <Card title="Menu">
             {menu.map((m, i) => (
               <div key={i} className="flex gap-2 mb-2">
-                <input className="input w-1/2" value={m.name} placeholder="Nama menu"
-                  onChange={(e) => updateMenu(i, "name", e.target.value)} />
+                <input className="input w-1/2"
+                  value={m.name}
+                  placeholder="Nama menu"
+                  onChange={(e) => updateMenu(i, "name", e.target.value)}
+                />
 
-                <input className="input w-1/2" type="text"
-                  value={formatNumber(m.price)} placeholder="Harga"
+                <input className="input w-1/2"
+                  type="text"
+                  value={formatNumber(m.price)}
+                  placeholder="Harga"
                   onChange={(e) => {
                     const raw = unformatNumber(e.target.value)
                     if (!isNaN(raw)) updateMenu(i, "price", raw)
                   }}
                 />
 
-                <button onClick={() => removeMenu(i)} className="bg-red-500 text-white px-3 rounded">
+                <button onClick={() => removeMenu(i)}
+                  className="bg-red-500 text-white px-3 rounded">
                   ✕
                 </button>
               </div>
             ))}
-            <button className="btn-green" onClick={addMenu}>+ Tambah Menu</button>
+            <button className="btn-green" onClick={addMenu}>
+              + Tambah Menu
+            </button>
           </Card>
 
           <Card title="Orders">
@@ -215,24 +252,34 @@ export default function App() {
                 <select className="input" value={o.person}
                   onChange={(e) => updateOrder(i, "person", e.target.value)}>
                   <option value="">-- pilih --</option>
-                  {validPeople.map((p, idx) => <option key={idx}>{p}</option>)}
+                  {validPeople.map((p, idx) => (
+                    <option key={idx}>{p}</option>
+                  ))}
                 </select>
 
                 <select className="input" value={o.menu}
                   onChange={(e) => updateOrder(i, "menu", e.target.value)}>
                   <option value="">-- pilih --</option>
-                  {menu.filter(m => m.name).map((m, idx) => <option key={idx}>{m.name}</option>)}
+                  {menu.filter(m => m.name).map((m, idx) => (
+                    <option key={idx}>{m.name}</option>
+                  ))}
                 </select>
 
-                <input className="input w-20" type="number" value={o.qty}
-                  onChange={(e) => updateOrder(i, "qty", e.target.value)} />
+                <input className="input w-20"
+                  type="number"
+                  value={o.qty}
+                  onChange={(e) => updateOrder(i, "qty", e.target.value)}
+                />
 
-                <button onClick={() => removeOrder(i)} className="bg-red-500 text-white px-3 rounded">
+                <button onClick={() => removeOrder(i)}
+                  className="bg-red-500 text-white px-3 rounded">
                   ✕
                 </button>
               </div>
             ))}
-            <button className="btn-purple" onClick={addOrder}>+ Tambah Order</button>
+            <button className="btn-purple" onClick={addOrder}>
+              + Tambah Order
+            </button>
           </Card>
 
         </div>
@@ -242,10 +289,18 @@ export default function App() {
 
           <Card title="Tax & Service (opsional)">
             <div className="flex gap-2">
-              <input className="input w-1/2" placeholder="Tax %" type="number"
-                value={tax} onChange={(e) => setTax(e.target.value)} />
-              <input className="input w-1/2" placeholder="Service %" type="number"
-                value={service} onChange={(e) => setService(e.target.value)} />
+              <input className="input w-1/2"
+                placeholder="Tax %"
+                type="number"
+                value={tax}
+                onChange={(e) => setTax(e.target.value)}
+              />
+              <input className="input w-1/2"
+                placeholder="Service %"
+                type="number"
+                value={service}
+                onChange={(e) => setService(e.target.value)}
+              />
             </div>
           </Card>
 
@@ -274,8 +329,12 @@ export default function App() {
                 {Object.keys(detail).map((name, i) => (
                   <div key={i} className="bg-gray-100 p-3 rounded mt-2 text-left">
                     <p className="font-medium">{name}</p>
-                    <p className="text-sm text-gray-600">{detail[name].items.join(", ")}</p>
-                    <p className="font-semibold">{formatRupiah(detail[name].total)}</p>
+                    <p className="text-sm text-gray-600">
+                      {detail[name].items.join(", ")}
+                    </p>
+                    <p className="font-semibold">
+                      {formatRupiah(detail[name].total)}
+                    </p>
                   </div>
                 ))}
 
