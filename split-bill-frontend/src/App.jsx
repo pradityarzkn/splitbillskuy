@@ -11,7 +11,6 @@ export default function App() {
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  // lock scroll pas loading
   useEffect(() => {
     document.body.style.overflow = loading ? "hidden" : "auto"
   }, [loading])
@@ -22,33 +21,36 @@ export default function App() {
       currency: "IDR"
     }).format(num)
 
-  // ===== FORMAT ANGKA =====
   const formatNumber = (value) => {
     if (!value) return ""
     return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")
   }
 
-  const unformatNumber = (value) => {
-    return value.replace(/\./g, "")
-  }
+  const unformatNumber = (value) => value.replace(/\./g, "")
 
-  // ---- People ----
+  // ===== PEOPLE =====
   const addPerson = () => setPeople([...people, ""])
   const updatePerson = (i, val) => {
     const copy = [...people]
     copy[i] = val
     setPeople(copy)
   }
+  const removePerson = (i) => {
+    setPeople(people.filter((_, idx) => idx !== i))
+  }
 
-  // ---- Menu ----
+  // ===== MENU =====
   const addMenu = () => setMenu([...menu, { name: "", price: "" }])
   const updateMenu = (i, field, val) => {
     const copy = [...menu]
     copy[i][field] = val
     setMenu(copy)
   }
+  const removeMenu = (i) => {
+    setMenu(menu.filter((_, idx) => idx !== i))
+  }
 
-  // ---- Orders ----
+  // ===== ORDERS =====
   const addOrder = () =>
     setOrders([
       ...orders,
@@ -64,8 +66,11 @@ export default function App() {
     copy[i][field] = field === "qty" ? Number(val) : val
     setOrders(copy)
   }
+  const removeOrder = (i) => {
+    setOrders(orders.filter((_, idx) => idx !== i))
+  }
 
-  // ---- Submit ----
+  // ===== SUBMIT =====
   const handleSubmit = async () => {
     try {
       setLoading(true)
@@ -97,7 +102,6 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-100">
 
-      {/* HEADER */}
       <div className="bg-black text-white text-center py-4 text-xl font-semibold shadow">
         SplitBillskuy 💸
       </div>
@@ -115,28 +119,35 @@ export default function App() {
             >
               <option value="">-- pilih --</option>
               {validPeople.map((p, i) => (
-                <option key={i} value={p}>
-                  {p}
-                </option>
+                <option key={i}>{p}</option>
               ))}
             </select>
           </Card>
 
+          {/* PEOPLE */}
           <Card title="People">
             {people.map((p, i) => (
-              <input
-                key={i}
-                className="input mb-2"
-                value={p}
-                placeholder="Nama"
-                onChange={(e) => updatePerson(i, e.target.value)}
-              />
+              <div key={i} className="flex gap-2 mb-2">
+                <input
+                  className="input flex-1"
+                  value={p}
+                  placeholder="Nama"
+                  onChange={(e) => updatePerson(i, e.target.value)}
+                />
+                <button
+                  onClick={() => removePerson(i)}
+                  className="bg-red-500 text-white px-3 rounded"
+                >
+                  ✕
+                </button>
+              </div>
             ))}
             <button className="btn-blue" onClick={addPerson}>
               + Tambah Orang
             </button>
           </Card>
 
+          {/* MENU */}
           <Card title="Menu">
             {menu.map((m, i) => (
               <div key={i} className="flex gap-2 mb-2">
@@ -159,6 +170,13 @@ export default function App() {
                     }
                   }}
                 />
+
+                <button
+                  onClick={() => removeMenu(i)}
+                  className="bg-red-500 text-white px-3 rounded"
+                >
+                  ✕
+                </button>
               </div>
             ))}
             <button className="btn-green" onClick={addMenu}>
@@ -166,6 +184,7 @@ export default function App() {
             </button>
           </Card>
 
+          {/* ORDERS */}
           <Card title="Orders">
             {orders.map((o, i) => (
               <div key={i} className="flex gap-2 mb-2">
@@ -197,6 +216,13 @@ export default function App() {
                   value={o.qty}
                   onChange={(e) => updateOrder(i, "qty", e.target.value)}
                 />
+
+                <button
+                  onClick={() => removeOrder(i)}
+                  className="bg-red-500 text-white px-3 rounded"
+                >
+                  ✕
+                </button>
               </div>
             ))}
 
@@ -259,12 +285,12 @@ export default function App() {
         </div>
       </div>
 
-      {/* 🔥 LOADING OVERLAY */}
+      {/* LOADING */}
       {loading && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white px-6 py-4 rounded-xl shadow flex items-center gap-3">
             <div className="w-6 h-6 border-4 border-gray-300 border-t-black rounded-full animate-spin"></div>
-            <span className="font-medium">Menghitung...</span>
+            <span>Menghitung...</span>
           </div>
         </div>
       )}
