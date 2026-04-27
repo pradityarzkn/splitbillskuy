@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import axios from "axios"
 
 export default function App() {
@@ -19,7 +19,7 @@ export default function App() {
     new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR"
-    }).format(num)
+    }).format(num || 0)
 
   const formatNumber = (value) => {
     if (!value) return ""
@@ -70,6 +70,40 @@ export default function App() {
     setOrders(orders.filter((_, idx) => idx !== i))
   }
 
+  // ===== DETAIL PER PERSON =====
+  const getDetailPerPerson = () => {
+    const menuMap = {}
+
+    menu.forEach(m => {
+      if (m.name) {
+        menuMap[m.name] = Number(unformatNumber(m.price || "0"))
+      }
+    })
+
+    const result = {}
+
+    orders.forEach(o => {
+      if (!o.person || !o.menu) return
+
+      if (!result[o.person]) {
+        result[o.person] = {
+          items: [],
+          total: 0
+        }
+      }
+
+      const price = menuMap[o.menu] || 0
+      const subtotal = price * o.qty
+
+      result[o.person].items.push(`${o.menu} x${o.qty}`)
+      result[o.person].total += subtotal
+    })
+
+    return result
+  }
+
+  const detail = useMemo(() => getDetailPerPerson(), [orders, menu])
+
   // ===== SUBMIT =====
   const handleSubmit = async () => {
     try {
@@ -102,6 +136,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-100">
 
+      {/* HEADER */}
       <div className="bg-black text-white text-center py-4 text-xl font-semibold shadow">
         SplitBillskuy 💸
       </div>
@@ -124,7 +159,6 @@ export default function App() {
             </select>
           </Card>
 
-          {/* PEOPLE */}
           <Card title="People">
             {people.map((p, i) => (
               <div key={i} className="flex gap-2 mb-2">
@@ -147,7 +181,6 @@ export default function App() {
             </button>
           </Card>
 
-          {/* MENU */}
           <Card title="Menu">
             {menu.map((m, i) => (
               <div key={i} className="flex gap-2 mb-2">
@@ -184,7 +217,6 @@ export default function App() {
             </button>
           </Card>
 
-          {/* ORDERS */}
           <Card title="Orders">
             {orders.map((o, i) => (
               <div key={i} className="flex gap-2 mb-2">
@@ -267,11 +299,39 @@ export default function App() {
             <div className="bg-white p-6 rounded-xl shadow">
               <h2 className="text-lg font-bold mb-3">Hasil</h2>
 
-              <p className="mb-2">
-                Total: <b>{formatRupiah(result.total)}</b>
+              <p>Total: <b>{formatRupiah(result.total)}</b></p>
+              <p className="text-sm text-gray-500 mb-2">
+                Subtotal: {formatRupiah(result.subtotal)}
               </p>
 
-              <div className="space-y-2">
+              <p className="mb-3">
+                Yang bayar: <b>{paidBy}</b>
+              </p>
+
+              <div className="mb-3">
+                <h3 className="font-semibold">Pesanan:</h3>
+
+                {Object.keys(detail).map((name, i) => (
+                  <div key={i} className="bg-gray-100 p-3 rounded mt-2">
+                    <p className="font-medium">{name}</p>
+                    <p className="text-sm text-gray-600">
+                      {detail[name].items.join(", ")}
+                    </p>
+                    <p className="font-semibold">
+                      {formatRupiah(detail[name].total)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="text-sm text-gray-600 mb-3">
+                Tax: {tax || 0}% ({formatRupiah(result.taxAmount)}) <br />
+                Service: {service || 0}% ({formatRupiah(result.serviceAmount)})
+              </div>
+
+              <h3 className="font-semibold mt-3">Pembayaran:</h3>
+
+              <div className="space-y-2 mt-2">
                 {result.transfers.map((t, i) => (
                   <div key={i} className="bg-gray-100 p-2 rounded">
                     {t.from} ➜ {t.to} :{" "}
@@ -285,7 +345,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* LOADING */}
       {loading && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white px-6 py-4 rounded-xl shadow flex items-center gap-3">
