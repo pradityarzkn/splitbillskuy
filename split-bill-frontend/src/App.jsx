@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import axios from "axios"
+import html2canvas from "html2canvas"
 
 export default function App() {
   const [paidBy, setPaidBy] = useState("")
@@ -10,6 +11,8 @@ export default function App() {
   const [service, setService] = useState("")
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
+
+  const resultRef = useRef()
 
   useEffect(() => {
     document.body.style.overflow = loading ? "hidden" : "auto"
@@ -70,7 +73,7 @@ export default function App() {
     setOrders(orders.filter((_, idx) => idx !== i))
   }
 
-  // ===== DETAIL PER PERSON =====
+  // ===== DETAIL =====
   const getDetailPerPerson = () => {
     const menuMap = {}
 
@@ -86,10 +89,7 @@ export default function App() {
       if (!o.person || !o.menu) return
 
       if (!result[o.person]) {
-        result[o.person] = {
-          items: [],
-          total: 0
-        }
+        result[o.person] = { items: [], total: 0 }
       }
 
       const price = menuMap[o.menu] || 0
@@ -133,6 +133,21 @@ export default function App() {
 
   const validPeople = people.filter(p => p && p.trim() !== "")
 
+  // ===== EXPORT =====
+  const handleExport = async () => {
+    if (!resultRef.current) return
+
+    const canvas = await html2canvas(resultRef.current, {
+      backgroundColor: "#ffffff",
+      scale: 2
+    })
+
+    const link = document.createElement("a")
+    link.download = "splitbill.png"
+    link.href = canvas.toDataURL()
+    link.click()
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
 
@@ -147,11 +162,7 @@ export default function App() {
         <div className="space-y-6">
 
           <Card title="Siapa yang bayar?">
-            <select
-              className="input"
-              value={paidBy}
-              onChange={(e) => setPaidBy(e.target.value)}
-            >
+            <select className="input" value={paidBy} onChange={(e) => setPaidBy(e.target.value)}>
               <option value="">-- pilih --</option>
               {validPeople.map((p, i) => (
                 <option key={i}>{p}</option>
@@ -168,99 +179,60 @@ export default function App() {
                   placeholder="Nama"
                   onChange={(e) => updatePerson(i, e.target.value)}
                 />
-                <button
-                  onClick={() => removePerson(i)}
-                  className="bg-red-500 text-white px-3 rounded"
-                >
+                <button onClick={() => removePerson(i)} className="bg-red-500 text-white px-3 rounded">
                   ✕
                 </button>
               </div>
             ))}
-            <button className="btn-blue" onClick={addPerson}>
-              + Tambah Orang
-            </button>
+            <button className="btn-blue" onClick={addPerson}>+ Tambah Orang</button>
           </Card>
 
           <Card title="Menu">
             {menu.map((m, i) => (
               <div key={i} className="flex gap-2 mb-2">
-                <input
-                  className="input w-1/2"
-                  value={m.name}
-                  placeholder="Nama menu"
-                  onChange={(e) => updateMenu(i, "name", e.target.value)}
-                />
+                <input className="input w-1/2" value={m.name} placeholder="Nama menu"
+                  onChange={(e) => updateMenu(i, "name", e.target.value)} />
 
-                <input
-                  className="input w-1/2"
-                  type="text"
-                  value={formatNumber(m.price)}
-                  placeholder="Harga"
+                <input className="input w-1/2" type="text"
+                  value={formatNumber(m.price)} placeholder="Harga"
                   onChange={(e) => {
                     const raw = unformatNumber(e.target.value)
-                    if (!isNaN(raw)) {
-                      updateMenu(i, "price", raw)
-                    }
+                    if (!isNaN(raw)) updateMenu(i, "price", raw)
                   }}
                 />
 
-                <button
-                  onClick={() => removeMenu(i)}
-                  className="bg-red-500 text-white px-3 rounded"
-                >
+                <button onClick={() => removeMenu(i)} className="bg-red-500 text-white px-3 rounded">
                   ✕
                 </button>
               </div>
             ))}
-            <button className="btn-green" onClick={addMenu}>
-              + Tambah Menu
-            </button>
+            <button className="btn-green" onClick={addMenu}>+ Tambah Menu</button>
           </Card>
 
           <Card title="Orders">
             {orders.map((o, i) => (
               <div key={i} className="flex gap-2 mb-2">
-                <select
-                  className="input"
-                  value={o.person}
-                  onChange={(e) => updateOrder(i, "person", e.target.value)}
-                >
+                <select className="input" value={o.person}
+                  onChange={(e) => updateOrder(i, "person", e.target.value)}>
                   <option value="">-- pilih --</option>
-                  {validPeople.map((p, idx) => (
-                    <option key={idx}>{p}</option>
-                  ))}
+                  {validPeople.map((p, idx) => <option key={idx}>{p}</option>)}
                 </select>
 
-                <select
-                  className="input"
-                  value={o.menu}
-                  onChange={(e) => updateOrder(i, "menu", e.target.value)}
-                >
+                <select className="input" value={o.menu}
+                  onChange={(e) => updateOrder(i, "menu", e.target.value)}>
                   <option value="">-- pilih --</option>
-                  {menu.filter(m => m.name).map((m, idx) => (
-                    <option key={idx}>{m.name}</option>
-                  ))}
+                  {menu.filter(m => m.name).map((m, idx) => <option key={idx}>{m.name}</option>)}
                 </select>
 
-                <input
-                  className="input w-20"
-                  type="number"
-                  value={o.qty}
-                  onChange={(e) => updateOrder(i, "qty", e.target.value)}
-                />
+                <input className="input w-20" type="number" value={o.qty}
+                  onChange={(e) => updateOrder(i, "qty", e.target.value)} />
 
-                <button
-                  onClick={() => removeOrder(i)}
-                  className="bg-red-500 text-white px-3 rounded"
-                >
+                <button onClick={() => removeOrder(i)} className="bg-red-500 text-white px-3 rounded">
                   ✕
                 </button>
               </div>
             ))}
-
-            <button className="btn-purple" onClick={addOrder}>
-              + Tambah Order
-            </button>
+            <button className="btn-purple" onClick={addOrder}>+ Tambah Order</button>
           </Card>
 
         </div>
@@ -270,20 +242,10 @@ export default function App() {
 
           <Card title="Tax & Service (opsional)">
             <div className="flex gap-2">
-              <input
-                className="input w-1/2"
-                placeholder="Tax %"
-                type="number"
-                value={tax}
-                onChange={(e) => setTax(e.target.value)}
-              />
-              <input
-                className="input w-1/2"
-                placeholder="Service %"
-                type="number"
-                value={service}
-                onChange={(e) => setService(e.target.value)}
-              />
+              <input className="input w-1/2" placeholder="Tax %" type="number"
+                value={tax} onChange={(e) => setTax(e.target.value)} />
+              <input className="input w-1/2" placeholder="Service %" type="number"
+                value={service} onChange={(e) => setService(e.target.value)} />
             </div>
           </Card>
 
@@ -296,50 +258,48 @@ export default function App() {
           </button>
 
           {result && (
-            <div className="bg-white p-6 rounded-xl shadow">
-              <h2 className="text-lg font-bold mb-3">Hasil</h2>
+            <>
+              <div ref={resultRef} className="bg-white p-6 rounded-xl shadow text-center">
+                <h2 className="text-xl font-bold mb-3">SplitBillskuy 💸</h2>
 
-              <p>Total: <b>{formatRupiah(result.total)}</b></p>
-              <p className="text-sm text-gray-500 mb-2">
-                Subtotal: {formatRupiah(result.subtotal)}
-              </p>
+                <p>Total: <b>{formatRupiah(result.total)}</b></p>
+                <p className="text-sm text-gray-500 mb-2">
+                  Subtotal: {formatRupiah(result.subtotal)}
+                </p>
 
-              <p className="mb-3">
-                Yang bayar: <b>{paidBy}</b>
-              </p>
-
-              <div className="mb-3">
-                <h3 className="font-semibold">Pesanan:</h3>
+                <p className="mb-3">
+                  Yang bayar: <b>{paidBy}</b>
+                </p>
 
                 {Object.keys(detail).map((name, i) => (
-                  <div key={i} className="bg-gray-100 p-3 rounded mt-2">
+                  <div key={i} className="bg-gray-100 p-3 rounded mt-2 text-left">
                     <p className="font-medium">{name}</p>
-                    <p className="text-sm text-gray-600">
-                      {detail[name].items.join(", ")}
-                    </p>
-                    <p className="font-semibold">
-                      {formatRupiah(detail[name].total)}
-                    </p>
+                    <p className="text-sm text-gray-600">{detail[name].items.join(", ")}</p>
+                    <p className="font-semibold">{formatRupiah(detail[name].total)}</p>
                   </div>
                 ))}
+
+                <div className="text-sm text-gray-600 mt-3">
+                  Tax: {tax || 0}% ({formatRupiah(result.taxAmount)}) <br />
+                  Service: {service || 0}% ({formatRupiah(result.serviceAmount)})
+                </div>
+
+                <div className="mt-3">
+                  {result.transfers.map((t, i) => (
+                    <div key={i}>
+                      {t.from} ➜ {t.to} : <b>{formatRupiah(t.amount)}</b>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div className="text-sm text-gray-600 mb-3">
-                Tax: {tax || 0}% ({formatRupiah(result.taxAmount)}) <br />
-                Service: {service || 0}% ({formatRupiah(result.serviceAmount)})
-              </div>
-
-              <h3 className="font-semibold mt-3">Pembayaran:</h3>
-
-              <div className="space-y-2 mt-2">
-                {result.transfers.map((t, i) => (
-                  <div key={i} className="bg-gray-100 p-2 rounded">
-                    {t.from} ➜ {t.to} :{" "}
-                    <b>{formatRupiah(t.amount)}</b>
-                  </div>
-                ))}
-              </div>
-            </div>
+              <button
+                onClick={handleExport}
+                className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold"
+              >
+                Export ke Gambar 📸
+              </button>
+            </>
           )}
 
         </div>
