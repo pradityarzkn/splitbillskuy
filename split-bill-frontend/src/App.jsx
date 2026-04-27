@@ -79,7 +79,7 @@ export default function App() {
 
     menu.forEach(m => {
       if (m.name) {
-        menuMap[m.name.trim()] = Number(unformatNumber(m.price || "0"))
+        menuMap[m.name] = Number(unformatNumber(m.price || "0"))
       }
     })
 
@@ -88,18 +88,15 @@ export default function App() {
     orders.forEach(o => {
       if (!o.person || !o.menu) return
 
-      const person = o.person.trim()
-      const menuName = o.menu.trim()
-
-      if (!result[person]) {
-        result[person] = { items: [], total: 0 }
+      if (!result[o.person]) {
+        result[o.person] = { items: [], total: 0 }
       }
 
-      const price = menuMap[menuName] || 0
+      const price = menuMap[o.menu] || 0
       const subtotal = price * o.qty
 
-      result[person].items.push(`${menuName} x${o.qty}`)
-      result[person].total += subtotal
+      result[o.person].items.push(`${o.menu} x${o.qty}`)
+      result[o.person].total += subtotal
     })
 
     return result
@@ -107,56 +104,38 @@ export default function App() {
 
   const detail = useMemo(() => getDetailPerPerson(), [orders, menu])
 
+  // ===== VALID DATA (INI KUNCI BIAR GA 400) =====
   const validPeople = people.filter(p => p && p.trim() !== "")
+  const validMenu = menu.filter(m => m.name && m.price)
+  const validOrders = orders.filter(o => o.person && o.menu && o.qty > 0)
 
-  // ===== SUBMIT (🔥 FIX DISINI) =====
+  // ===== SUBMIT =====
   const handleSubmit = async () => {
+    if (!paidBy) return alert("Pilih siapa yang bayar")
+    if (validMenu.length === 0) return alert("Menu belum diisi")
+    if (validOrders.length === 0) return alert("Order belum diisi")
+
     try {
       setLoading(true)
-
-      const cleanMenu = menu.filter(m => m.name && m.price)
-      const cleanOrders = orders.filter(o => o.person && o.menu)
-
-      if (!paidBy) {
-        alert("Pilih siapa yang bayar")
-        return
-      }
-
-      if (cleanMenu.length === 0) {
-        alert("Menu belum diisi")
-        return
-      }
-
-      if (cleanOrders.length === 0) {
-        alert("Order belum diisi")
-        return
-      }
 
       const res = await axios.post(
         "https://splitbillskuy-api.onrender.com/calculate",
         {
-          paidBy: paidBy.trim(),
+          paidBy,
           tax: Number(tax || 0),
           service: Number(service || 0),
-
-          menu: cleanMenu.map(m => ({
-            name: m.name.trim(),
-            price: Number(unformatNumber(m.price.toString()))
+          menu: validMenu.map(m => ({
+            name: m.name,
+            price: Number(unformatNumber(m.price))
           })),
-
-          orders: cleanOrders.map(o => ({
-            ...o,
-            person: o.person.trim(),
-            menu: o.menu.trim()
-          }))
+          orders: validOrders
         }
       )
 
       setResult(res.data)
-
     } catch (err) {
-      console.log("ERROR BACKEND:", err.response?.data)
-      alert(err.response?.data?.error || err.message)
+      console.log(err.response?.data)
+      alert("Error: " + (err.response?.data?.error || err.message))
     } finally {
       setLoading(false)
     }
@@ -172,7 +151,7 @@ export default function App() {
     })
 
     const link = document.createElement("a")
-    link.download = `splitbill-${Date.now()}.png`
+    link.download = "splitbill.png"
     link.href = canvas.toDataURL()
     link.click()
   }
@@ -190,7 +169,11 @@ export default function App() {
         <div className="space-y-6">
 
           <Card title="Siapa yang bayar?">
-            <select className="input" value={paidBy} onChange={(e) => setPaidBy(e.target.value)}>
+            <select
+              className="input"
+              value={paidBy}
+              onChange={(e) => setPaidBy(e.target.value)}
+            >
               <option value="">-- pilih --</option>
               {validPeople.map((p, i) => (
                 <option key={i}>{p}</option>
@@ -201,12 +184,16 @@ export default function App() {
           <Card title="People">
             {people.map((p, i) => (
               <div key={i} className="flex gap-2 mb-2">
-                <input className="input flex-1" value={p}
+                <input
+                  className="input flex-1"
+                  value={p}
                   placeholder="Nama"
                   onChange={(e) => updatePerson(i, e.target.value)}
                 />
-                <button onClick={() => removePerson(i)}
-                  className="bg-red-500 text-white px-3 rounded">
+                <button
+                  onClick={() => removePerson(i)}
+                  className="bg-red-500 text-white px-3 rounded"
+                >
                   ✕
                 </button>
               </div>
@@ -219,13 +206,15 @@ export default function App() {
           <Card title="Menu">
             {menu.map((m, i) => (
               <div key={i} className="flex gap-2 mb-2">
-                <input className="input w-1/2"
+                <input
+                  className="input w-1/2"
                   value={m.name}
                   placeholder="Nama menu"
                   onChange={(e) => updateMenu(i, "name", e.target.value)}
                 />
 
-                <input className="input w-1/2"
+                <input
+                  className="input w-1/2"
                   type="text"
                   value={formatNumber(m.price)}
                   placeholder="Harga"
@@ -235,8 +224,10 @@ export default function App() {
                   }}
                 />
 
-                <button onClick={() => removeMenu(i)}
-                  className="bg-red-500 text-white px-3 rounded">
+                <button
+                  onClick={() => removeMenu(i)}
+                  className="bg-red-500 text-white px-3 rounded"
+                >
                   ✕
                 </button>
               </div>
@@ -249,34 +240,44 @@ export default function App() {
           <Card title="Orders">
             {orders.map((o, i) => (
               <div key={i} className="flex gap-2 mb-2">
-                <select className="input" value={o.person}
-                  onChange={(e) => updateOrder(i, "person", e.target.value)}>
+                <select
+                  className="input"
+                  value={o.person}
+                  onChange={(e) => updateOrder(i, "person", e.target.value)}
+                >
                   <option value="">-- pilih --</option>
                   {validPeople.map((p, idx) => (
                     <option key={idx}>{p}</option>
                   ))}
                 </select>
 
-                <select className="input" value={o.menu}
-                  onChange={(e) => updateOrder(i, "menu", e.target.value)}>
+                <select
+                  className="input"
+                  value={o.menu}
+                  onChange={(e) => updateOrder(i, "menu", e.target.value)}
+                >
                   <option value="">-- pilih --</option>
-                  {menu.filter(m => m.name).map((m, idx) => (
+                  {validMenu.map((m, idx) => (
                     <option key={idx}>{m.name}</option>
                   ))}
                 </select>
 
-                <input className="input w-20"
+                <input
+                  className="input w-20"
                   type="number"
                   value={o.qty}
                   onChange={(e) => updateOrder(i, "qty", e.target.value)}
                 />
 
-                <button onClick={() => removeOrder(i)}
-                  className="bg-red-500 text-white px-3 rounded">
+                <button
+                  onClick={() => removeOrder(i)}
+                  className="bg-red-500 text-white px-3 rounded"
+                >
                   ✕
                 </button>
               </div>
             ))}
+
             <button className="btn-purple" onClick={addOrder}>
               + Tambah Order
             </button>
@@ -289,13 +290,15 @@ export default function App() {
 
           <Card title="Tax & Service (opsional)">
             <div className="flex gap-2">
-              <input className="input w-1/2"
+              <input
+                className="input w-1/2"
                 placeholder="Tax %"
                 type="number"
                 value={tax}
                 onChange={(e) => setTax(e.target.value)}
               />
-              <input className="input w-1/2"
+              <input
+                className="input w-1/2"
                 placeholder="Service %"
                 type="number"
                 value={service}
@@ -318,9 +321,6 @@ export default function App() {
                 <h2 className="text-xl font-bold mb-3">SplitBillskuy 💸</h2>
 
                 <p>Total: <b>{formatRupiah(result.total)}</b></p>
-                <p className="text-sm text-gray-500 mb-2">
-                  Subtotal: {formatRupiah(result.subtotal)}
-                </p>
 
                 <p className="mb-3">
                   Yang bayar: <b>{paidBy}</b>
@@ -329,12 +329,8 @@ export default function App() {
                 {Object.keys(detail).map((name, i) => (
                   <div key={i} className="bg-gray-100 p-3 rounded mt-2 text-left">
                     <p className="font-medium">{name}</p>
-                    <p className="text-sm text-gray-600">
-                      {detail[name].items.join(", ")}
-                    </p>
-                    <p className="font-semibold">
-                      {formatRupiah(detail[name].total)}
-                    </p>
+                    <p className="text-sm text-gray-600">{detail[name].items.join(", ")}</p>
+                    <p className="font-semibold">{formatRupiah(detail[name].total)}</p>
                   </div>
                 ))}
 
@@ -365,10 +361,9 @@ export default function App() {
       </div>
 
       {loading && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white px-6 py-4 rounded-xl shadow flex items-center gap-3">
-            <div className="w-6 h-6 border-4 border-gray-300 border-t-black rounded-full animate-spin"></div>
-            <span>Menghitung...</span>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+          <div className="bg-white px-6 py-4 rounded-xl shadow">
+            Menghitung...
           </div>
         </div>
       )}
