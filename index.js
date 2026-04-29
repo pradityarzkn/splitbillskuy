@@ -16,14 +16,14 @@ app.get("/", (req, res) => {
 app.post("/calculate", (req, res) => {
   const { paidBy, menu, orders, tax = 0, service = 0 } = req.body
 
-  // validasi
+  // ===== VALIDASI =====
   if (!paidBy || !menu || !orders) {
     return res.status(400).json({
       error: "paidBy, menu, orders wajib diisi"
     })
   }
 
-  // 1. map menu
+  // ===== 1. MAP MENU =====
   const menuMap = {}
   menu.forEach(m => {
     if (m.name) {
@@ -31,7 +31,7 @@ app.post("/calculate", (req, res) => {
     }
   })
 
-  // 2. subtotal per orang
+  // ===== 2. HITUNG SUBTOTAL =====
   const personSubtotal = {}
   let subtotal = 0
 
@@ -44,39 +44,37 @@ app.post("/calculate", (req, res) => {
       })
     }
 
-    const totalItem = price * o.qty
-
-    // 🔥 CASE 1: SHARING
-    if (o.sharedBy && Array.isArray(o.sharedBy)) {
-      const splitCount = o.sharedBy.length
-
-      if (splitCount === 0) {
-        return res.status(400).json({
-          error: `sharedBy kosong di menu ${o.menu}`
-        })
-      }
-
-      const shareAmount = totalItem / splitCount
-
-      o.sharedBy.forEach(person => {
-        if (!personSubtotal[person]) {
-          personSubtotal[person] = 0
-        }
-
-        personSubtotal[person] += shareAmount
+    if (!o.qty || o.qty <= 0) {
+      return res.status(400).json({
+        error: `Qty tidak valid di menu ${o.menu}`
       })
-
-      subtotal += totalItem
     }
 
-    // 🔥 CASE 2: NORMAL
-    else {
-      if (!o.person) {
+    const totalItem = price * o.qty
+
+    // 🔥 PRIORITAS: persons (FE terbaru)
+    if (o.persons && Array.isArray(o.persons)) {
+      if (o.persons.length === 0) {
         return res.status(400).json({
           error: `Person kosong di order ${o.menu}`
         })
       }
 
+      const split = totalItem / o.persons.length
+
+      o.persons.forEach(p => {
+        if (!personSubtotal[p]) {
+          personSubtotal[p] = 0
+        }
+
+        personSubtotal[p] += split
+      })
+
+      subtotal += totalItem
+    }
+
+    // 🔥 BACKWARD COMPATIBILITY (kalau masih ada yg pakai lama)
+    else if (o.person) {
       if (!personSubtotal[o.person]) {
         personSubtotal[o.person] = 0
       }
@@ -84,27 +82,33 @@ app.post("/calculate", (req, res) => {
       personSubtotal[o.person] += totalItem
       subtotal += totalItem
     }
+
+    else {
+      return res.status(400).json({
+        error: `Person kosong di order ${o.menu}`
+      })
+    }
   }
 
-  // edge case
+  // ===== EDGE CASE =====
   if (subtotal === 0) {
     return res.status(400).json({
       error: "Subtotal tidak boleh 0"
     })
   }
 
-  // 3. tax & service
+  // ===== 3. TAX & SERVICE =====
   const taxAmount = subtotal * (tax / 100)
   const serviceAmount = subtotal * (service / 100)
   const total = subtotal + taxAmount + serviceAmount
 
-  // 4. init balance
+  // ===== 4. INIT BALANCE =====
   const balances = {}
   Object.keys(personSubtotal).forEach(p => {
     balances[p] = 0
   })
 
-  // 5. distribusi biaya
+  // ===== 5. DISTRIBUSI =====
   Object.keys(personSubtotal).forEach(p => {
     const ratio = personSubtotal[p] / subtotal
 
@@ -116,10 +120,10 @@ app.post("/calculate", (req, res) => {
     balances[p] -= finalShare
   })
 
-  // 6. yang bayar cover semua
+  // ===== 6. YANG BAYAR =====
   balances[paidBy] = (balances[paidBy] || 0) + total
 
-  // 7. split debtor & creditor
+  // ===== 7. SPLIT =====
   const creditors = []
   const debtors = []
 
@@ -133,7 +137,7 @@ app.post("/calculate", (req, res) => {
     }
   })
 
-  // 8. settlement
+  // ===== 8. SETTLEMENT =====
   const transfers = []
 
   let i = 0
@@ -158,12 +162,13 @@ app.post("/calculate", (req, res) => {
     if (c.amount === 0) j++
   }
 
+  // ===== RESPONSE =====
   res.json({
     subtotal,
     taxAmount,
     serviceAmount,
     total,
-    personSubtotal, // 🔥 tambahan biar frontend bisa detail
+    personSubtotal,
     balances,
     transfers
   })
