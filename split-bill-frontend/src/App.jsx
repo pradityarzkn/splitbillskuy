@@ -53,13 +53,13 @@ export default function App() {
     setMenu(menu.filter((_, idx) => idx !== i))
   }
 
-  // ===== ORDERS (MULTI PERSON) =====
+  // ===== ORDERS =====
   const addOrder = () =>
     setOrders([
       ...orders,
       {
         persons: [],
-        menu: menu.find(m => m.name)?.name || "",
+        menu: "",
         qty: 1
       }
     ])
@@ -74,7 +74,7 @@ export default function App() {
     setOrders(orders.filter((_, idx) => idx !== i))
   }
 
-  // ===== DETAIL (SUPPORT SHARING) =====
+  // ===== DETAIL =====
   const getDetailPerPerson = () => {
     const menuMap = {}
 
@@ -182,7 +182,7 @@ export default function App() {
             >
               <option value="">-- pilih --</option>
               {validPeople.map((p, i) => (
-                <option key={i}>{p}</option>
+                <option key={i} value={p}>{p}</option>
               ))}
             </select>
           </Card>
@@ -193,6 +193,7 @@ export default function App() {
                 <input
                   className="input flex-1"
                   value={p}
+                  placeholder="Nama"
                   onChange={(e) => updatePerson(i, e.target.value)}
                 />
                 <button onClick={() => removePerson(i)} className="bg-red-500 text-white px-3 rounded">
@@ -211,11 +212,13 @@ export default function App() {
                 <input
                   className="input w-1/2"
                   value={m.name}
+                  placeholder="Nama menu"
                   onChange={(e) => updateMenu(i, "name", e.target.value)}
                 />
                 <input
                   className="input w-1/2"
                   value={formatNumber(m.price)}
+                  placeholder="Harga"
                   onChange={(e) => {
                     const raw = unformatNumber(e.target.value)
                     if (!isNaN(raw)) updateMenu(i, "price", raw)
@@ -231,7 +234,7 @@ export default function App() {
             </button>
           </Card>
 
-          {/* 🔥 ORDERS CHECKBOX */}
+          {/* ORDERS */}
           <Card title="Orders">
             {orders.map((o, i) => (
               <div key={i} className="mb-3 bg-gray-50 p-3 rounded">
@@ -239,12 +242,12 @@ export default function App() {
                 <div className="flex gap-2 mb-2">
                   <select
                     className="input flex-1"
-                    value={o.menu}
+                    value={o.menu || ""}
                     onChange={(e) => updateOrder(i, "menu", e.target.value)}
                   >
                     <option value="">-- pilih menu --</option>
                     {validMenu.map((m, idx) => (
-                      <option key={idx}>{m.name}</option>
+                      <option key={idx} value={m.name}>{m.name}</option>
                     ))}
                   </select>
 
@@ -298,8 +301,20 @@ export default function App() {
 
           <Card title="Tax & Service">
             <div className="flex gap-2">
-              <input className="input w-1/2" type="number" value={tax} onChange={(e) => setTax(e.target.value)} />
-              <input className="input w-1/2" type="number" value={service} onChange={(e) => setService(e.target.value)} />
+              <input
+                className="input w-1/2"
+                type="number"
+                placeholder="Tax (%)"
+                value={tax}
+                onChange={(e) => setTax(e.target.value)}
+              />
+              <input
+                className="input w-1/2"
+                type="number"
+                placeholder="Service (%)"
+                value={service}
+                onChange={(e) => setService(e.target.value)}
+              />
             </div>
           </Card>
 
@@ -328,7 +343,7 @@ export default function App() {
                 ))}
 
                 <div className="mt-2 text-sm">
-                  Tax: {tax}% | Service: {service}%
+                  Tax: {tax || 0}% | Service: {service || 0}%
                 </div>
 
                 <div className="mt-2">
