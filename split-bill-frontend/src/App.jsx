@@ -66,7 +66,15 @@ export default function App() {
 
   const updateOrder = (i, field, val) => {
     const copy = [...orders]
-    copy[i][field] = field === "qty" ? Number(val) : val
+
+    if (field === "persons") {
+      copy[i].persons = val
+    } else if (field === "qty") {
+      copy[i].qty = Number(val)
+    } else {
+      copy[i][field] = val
+    }
+
     setOrders(copy)
   }
 
@@ -91,7 +99,7 @@ export default function App() {
 
       const price = menuMap[o.menu] || 0
       const total = price * o.qty
-      const split = o.persons.length ? total / o.persons.length : 0
+      const split = total / o.persons.length
 
       o.persons.forEach(p => {
         if (!result[p]) {
@@ -110,8 +118,8 @@ export default function App() {
 
   // ===== VALID =====
   const validPeople = people.filter(p => p && p.trim() !== "")
-  const validMenu = menu.filter(m => m.name) // buat dropdown
-  const submitMenu = menu.filter(m => m.name && m.price) // buat API
+  const validMenu = menu.filter(m => m.name) // dropdown
+  const submitMenu = menu.filter(m => m.name && m.price)
   const validOrders = orders.filter(
     o => o.persons?.length > 0 && o.menu && o.qty > 0
   )
@@ -231,6 +239,7 @@ export default function App() {
             </button>
           </Card>
 
+          {/* ORDERS */}
           <Card title="Orders">
             {orders.map((o, i) => (
               <div key={i} className="mb-3 bg-gray-50 p-3 rounded">
@@ -238,12 +247,14 @@ export default function App() {
                 <div className="flex gap-2 mb-2">
                   <select
                     className="input flex-1"
-                    value={o.menu || ""}
+                    value={o.menu}
                     onChange={(e) => updateOrder(i, "menu", e.target.value)}
                   >
                     <option value="">-- pilih menu --</option>
                     {validMenu.map((m, idx) => (
-                      <option key={idx} value={m.name}>{m.name}</option>
+                      <option key={idx} value={m.name}>
+                        {m.name}
+                      </option>
                     ))}
                   </select>
 
@@ -259,17 +270,25 @@ export default function App() {
                   </button>
                 </div>
 
+                {/* SELECTED PEOPLE */}
+                <div className="text-xs text-gray-500 mb-1">
+                  Dipilih: {o.persons.join(", ") || "-"}
+                </div>
+
                 <div className="flex flex-wrap gap-2">
                   {validPeople.map((p, idx) => (
                     <label key={idx} className="flex items-center gap-1 text-sm bg-white px-2 py-1 rounded border">
                       <input
                         type="checkbox"
-                        checked={o.persons?.includes(p) || false}
+                        checked={o.persons.includes(p)}
                         onChange={(e) => {
-                          let updated = o.persons || []
+                          let updated = [...o.persons]
 
-                          if (e.target.checked) updated = [...updated, p]
-                          else updated = updated.filter(x => x !== p)
+                          if (e.target.checked) {
+                            if (!updated.includes(p)) updated.push(p)
+                          } else {
+                            updated = updated.filter(x => x !== p)
+                          }
 
                           updateOrder(i, "persons", updated)
                         }}
