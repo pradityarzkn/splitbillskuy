@@ -3,7 +3,6 @@ const cors = require("cors")
 
 const app = express()
 
-// ✅ FIX WAJIB buat deploy
 const PORT = process.env.PORT || 3001
 
 app.use(cors())
@@ -45,31 +44,62 @@ app.post("/calculate", (req, res) => {
       })
     }
 
-    const amount = price * o.qty
+    const totalItem = price * o.qty
 
-    if (!personSubtotal[o.person]) {
-      personSubtotal[o.person] = 0
+    // 🔥 CASE 1: SHARING
+    if (o.sharedBy && Array.isArray(o.sharedBy)) {
+      const splitCount = o.sharedBy.length
+
+      if (splitCount === 0) {
+        return res.status(400).json({
+          error: `sharedBy kosong di menu ${o.menu}`
+        })
+      }
+
+      const shareAmount = totalItem / splitCount
+
+      o.sharedBy.forEach(person => {
+        if (!personSubtotal[person]) {
+          personSubtotal[person] = 0
+        }
+
+        personSubtotal[person] += shareAmount
+      })
+
+      subtotal += totalItem
     }
 
-    personSubtotal[o.person] += amount
-    subtotal += amount
+    // 🔥 CASE 2: NORMAL
+    else {
+      if (!o.person) {
+        return res.status(400).json({
+          error: `Person kosong di order ${o.menu}`
+        })
+      }
+
+      if (!personSubtotal[o.person]) {
+        personSubtotal[o.person] = 0
+      }
+
+      personSubtotal[o.person] += totalItem
+      subtotal += totalItem
+    }
   }
 
-  // edge case: kosong
+  // edge case
   if (subtotal === 0) {
     return res.status(400).json({
       error: "Subtotal tidak boleh 0"
     })
   }
 
-  // 3. hitung tax & service
+  // 3. tax & service
   const taxAmount = subtotal * (tax / 100)
   const serviceAmount = subtotal * (service / 100)
   const total = subtotal + taxAmount + serviceAmount
 
   // 4. init balance
   const balances = {}
-
   Object.keys(personSubtotal).forEach(p => {
     balances[p] = 0
   })
@@ -89,7 +119,7 @@ app.post("/calculate", (req, res) => {
   // 6. yang bayar cover semua
   balances[paidBy] = (balances[paidBy] || 0) + total
 
-  // 7. pisahin creditor & debtor
+  // 7. split debtor & creditor
   const creditors = []
   const debtors = []
 
@@ -133,6 +163,7 @@ app.post("/calculate", (req, res) => {
     taxAmount,
     serviceAmount,
     total,
+    personSubtotal, // 🔥 tambahan biar frontend bisa detail
     balances,
     transfers
   })
