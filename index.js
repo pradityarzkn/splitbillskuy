@@ -2,7 +2,6 @@ const express = require("express")
 const cors = require("cors")
 
 const app = express()
-
 const PORT = process.env.PORT || 3001
 
 app.use(cors())
@@ -17,7 +16,7 @@ app.post("/calculate", (req, res) => {
   const { paidBy, menu, orders, tax = 0, service = 0 } = req.body
 
   // ===== VALIDASI =====
-  if (!paidBy || !menu || !orders) {
+  if (!paidBy || !Array.isArray(menu) || !Array.isArray(orders)) {
     return res.status(400).json({
       error: "paidBy, menu, orders wajib diisi"
     })
@@ -26,16 +25,29 @@ app.post("/calculate", (req, res) => {
   // ===== 1. MAP MENU =====
   const menuMap = {}
   menu.forEach(m => {
-    if (m.name) {
-      menuMap[m.name] = Number(m.price || 0)
+    if (m.name && m.price !== undefined) {
+      menuMap[m.name] = Number(m.price)
     }
   })
+
+  if (Object.keys(menuMap).length === 0) {
+    return res.status(400).json({
+      error: "Menu kosong atau harga belum diisi"
+    })
+  }
 
   // ===== 2. HITUNG SUBTOTAL =====
   const personSubtotal = {}
   let subtotal = 0
 
   for (const o of orders) {
+
+    if (!o.menu) {
+      return res.status(400).json({
+        error: "Menu pada order kosong"
+      })
+    }
+
     const price = menuMap[o.menu]
 
     if (price === undefined) {
@@ -50,44 +62,27 @@ app.post("/calculate", (req, res) => {
       })
     }
 
-    const totalItem = price * o.qty
+    // 🔥 FIX PENTING: normalize persons
+    const persons = Array.isArray(o.persons) ? o.persons.filter(p => p) : []
 
-    // 🔥 PRIORITAS: persons (FE terbaru)
-    if (o.persons && Array.isArray(o.persons)) {
-      if (o.persons.length === 0) {
-        return res.status(400).json({
-          error: `Person kosong di order ${o.menu}`
-        })
-      }
-
-      const split = totalItem / o.persons.length
-
-      o.persons.forEach(p => {
-        if (!personSubtotal[p]) {
-          personSubtotal[p] = 0
-        }
-
-        personSubtotal[p] += split
-      })
-
-      subtotal += totalItem
-    }
-
-    // 🔥 BACKWARD COMPATIBILITY (kalau masih ada yg pakai lama)
-    else if (o.person) {
-      if (!personSubtotal[o.person]) {
-        personSubtotal[o.person] = 0
-      }
-
-      personSubtotal[o.person] += totalItem
-      subtotal += totalItem
-    }
-
-    else {
+    if (persons.length === 0) {
       return res.status(400).json({
-        error: `Person kosong di order ${o.menu}`
+        error: `Pilih orang untuk menu ${o.menu}`
       })
     }
+
+    const totalItem = price * o.qty
+    const split = totalItem / persons.length
+
+    persons.forEach(p => {
+      if (!personSubtotal[p]) {
+        personSubtotal[p] = 0
+      }
+
+      personSubtotal[p] += split
+    })
+
+    subtotal += totalItem
   }
 
   // ===== EDGE CASE =====
