@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react"
+import { useState, useMemo, useRef } from "react"
 import axios from "axios"
 import html2canvas from "html2canvas"
 
@@ -13,10 +13,6 @@ export default function App() {
   const [loading, setLoading] = useState(false)
 
   const resultRef = useRef()
-
-  useEffect(() => {
-    document.body.style.overflow = loading ? "hidden" : "auto"
-  }, [loading])
 
   const formatRupiah = (num) =>
     new Intl.NumberFormat("id-ID", {
@@ -33,36 +29,32 @@ export default function App() {
 
   // ===== PEOPLE =====
   const addPerson = () => setPeople([...people, ""])
-
   const updatePerson = (i, val) => {
-    const copy = [...people]
-    copy[i] = val
-    setPeople(copy)
+    setPeople(prev => prev.map((p, idx) => idx === i ? val : p))
   }
-
   const removePerson = (i) => {
-    setPeople(people.filter((_, idx) => idx !== i))
+    setPeople(prev => prev.filter((_, idx) => idx !== i))
   }
 
   // ===== MENU =====
   const addMenu = () => setMenu([...menu, { name: "", price: "" }])
-
   const updateMenu = (i, field, val) => {
-    const copy = [...menu]
-    copy[i] = { ...copy[i], [field]: val }
-    setMenu(copy)
+    setMenu(prev =>
+      prev.map((m, idx) =>
+        idx === i ? { ...m, [field]: val } : m
+      )
+    )
   }
-
   const removeMenu = (i) => {
-    setMenu(menu.filter((_, idx) => idx !== i))
+    setMenu(prev => prev.filter((_, idx) => idx !== i))
   }
 
   // ===== ORDERS =====
   const addOrder = () => {
-    setOrders([
-      ...orders,
+    setOrders(prev => [
+      ...prev,
       {
-        id: Date.now() + Math.random(), // 🔥 anti reset bug
+        id: Date.now(),
         persons: [],
         menu: "",
         qty: 1
@@ -70,57 +62,99 @@ export default function App() {
     ])
   }
 
-  const updateOrder = (id, field, val) => {
+  const updateOrder = (i, field, val) => {
     setOrders(prev =>
-      prev.map(o =>
-        o.id === id
-          ? {
-              ...o,
-              [field]: field === "qty" ? Number(val) : val
-            }
+      prev.map((o, idx) =>
+        idx === i
+          ? { ...o, [field]: field === "qty" ? Number(val) : val }
           : o
       )
     )
   }
 
-  const removeOrder = (id) => {
-    setOrders(prev => prev.filter(o => o.id !== id))
+  const removeOrder = (i) => {
+    setOrders(prev => prev.filter((_, idx) => idx !== i))
   }
 
   // ===== VALID =====
   const validPeople = people.filter(p => p && p.trim() !== "")
-  const validMenu = menu.filter(m => m.name) // dropdown
+  const validMenu = menu.filter(m => m.name && m.name.trim() !== "")
   const submitMenu = menu.filter(m => m.name && m.price)
 
-  const validOrders = orders.filter(
-    o => o.persons.length > 0 && o.menu && o.qty > 0
+  const validOrders = orders.filter(o =>
+    o.menu &&
+    o.qty > 0 &&
+    Array.isArray(o.persons) &&
+    o.persons.length > 0
   )
+
+  // ===== DETAIL =====
+  const detail = useMemo(() => {
+    const menuMap = {}
+
+    menu.forEach(m => {
+      if (m.name && m.price) {
+        menuMap[m.name] = Number(unformatNumber(m.price))
+      }
+    })
+
+    const res = {}
+
+    orders.forEach(o => {
+      if (!o.menu || !o.persons?.length) return
+
+      const price = menuMap[o.menu] || 0
+      const total = price * o.qty
+      const split = total / o.persons.length
+
+      o.persons.forEach(p => {
+        if (!res[p]) res[p] = { items: [], total: 0 }
+        res[p].items.push(`${o.menu} x${o.qty}`)
+        res[p].total += split
+      })
+    })
+
+    return res
+  }, [orders, menu])
 
   // ===== SUBMIT =====
   const handleSubmit = async () => {
     if (!paidBy) return alert("Pilih siapa yang bayar")
     if (submitMenu.length === 0) return alert("Harga menu belum lengkap")
-    if (validOrders.length === 0) return alert("Order belum diisi")
+
+    if (validOrders.length === 0) {
+      console.log("ORDERS:", orders)
+      return alert("Order belum lengkap (menu / orang belum dipilih)")
+    }
 
     try {
       setLoading(true)
 
+      const payload = {
+        paidBy,
+        tax: Number(tax || 0),
+        service: Number(service || 0),
+        menu: submitMenu.map(m => ({
+          name: m.name.trim(),
+          price: Number(unformatNumber(m.price))
+        })),
+        orders: validOrders.map(o => ({
+          menu: o.menu,
+          qty: o.qty,
+          persons: o.persons
+        }))
+      }
+
+      console.log("PAYLOAD:", payload)
+
       const res = await axios.post(
         "https://splitbillskuy-api.onrender.com/calculate",
-        {
-          paidBy,
-          tax: Number(tax || 0),
-          service: Number(service || 0),
-          menu: submitMenu.map(m => ({
-            name: m.name,
-            price: Number(unformatNumber(m.price))
-          })),
-          orders: validOrders
-        }
+        payload
       )
 
       setResult(res.data)
     } catch (err) {
+      console.log(err.response?.data)
       alert("Error: " + (err.response?.data?.error || err.message))
     } finally {
       setLoading(false)
@@ -142,8 +176,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-
-      <div className="bg-black text-white text-center py-4 text-xl font-semibold shadow">
+      <div className="bg-black text-white text-center py-4 text-xl font-semibold">
         SplitBillskuy 💸
       </div>
 
@@ -153,11 +186,7 @@ export default function App() {
         <div className="space-y-6">
 
           <Card title="Siapa yang bayar?">
-            <select
-              className="input"
-              value={paidBy}
-              onChange={(e) => setPaidBy(e.target.value)}
-            >
+            <select className="input" value={paidBy} onChange={(e) => setPaidBy(e.target.value)}>
               <option value="">-- pilih --</option>
               {validPeople.map((p, i) => (
                 <option key={i} value={p}>{p}</option>
@@ -171,12 +200,13 @@ export default function App() {
                 <input
                   className="input flex-1"
                   value={p}
+                  placeholder="Nama"
                   onChange={(e) => updatePerson(i, e.target.value)}
                 />
                 <button onClick={() => removePerson(i)} className="bg-red-500 text-white px-3 rounded">✕</button>
               </div>
             ))}
-            <button className="btn-blue" onClick={addPerson}>+ Tambah Orang</button>
+            <button onClick={addPerson} className="btn-blue">+ Tambah Orang</button>
           </Card>
 
           <Card title="Menu">
@@ -194,24 +224,26 @@ export default function App() {
                   placeholder="Harga"
                   onChange={(e) => {
                     const raw = unformatNumber(e.target.value)
-                    if (!isNaN(raw)) updateMenu(i, "price", raw)
+                    if (raw === "" || !isNaN(raw)) {
+                      updateMenu(i, "price", raw)
+                    }
                   }}
                 />
                 <button onClick={() => removeMenu(i)} className="bg-red-500 text-white px-3 rounded">✕</button>
               </div>
             ))}
-            <button className="btn-green" onClick={addMenu}>+ Tambah Menu</button>
+            <button onClick={addMenu} className="btn-green">+ Tambah Menu</button>
           </Card>
 
           <Card title="Orders">
-            {orders.map((o) => (
+            {orders.map((o, i) => (
               <div key={o.id} className="mb-3 bg-gray-50 p-3 rounded">
 
                 <div className="flex gap-2 mb-2">
                   <select
                     className="input flex-1"
                     value={o.menu}
-                    onChange={(e) => updateOrder(o.id, "menu", e.target.value)}
+                    onChange={(e) => updateOrder(i, "menu", e.target.value)}
                   >
                     <option value="">-- pilih menu --</option>
                     {validMenu.map((m, idx) => (
@@ -223,15 +255,14 @@ export default function App() {
                     className="input w-20"
                     type="number"
                     value={o.qty}
-                    onChange={(e) => updateOrder(o.id, "qty", e.target.value)}
+                    onChange={(e) => updateOrder(i, "qty", e.target.value)}
                   />
 
-                  <button onClick={() => removeOrder(o.id)} className="bg-red-500 text-white px-3 rounded">✕</button>
+                  <button onClick={() => removeOrder(i)} className="bg-red-500 text-white px-3 rounded">✕</button>
                 </div>
 
-                {/* DEBUG VISUAL */}
-                <div className="text-xs text-blue-500 mb-1">
-                  Selected menu: {o.menu || "-"}
+                <div className="text-xs text-gray-500 mb-1">
+                  Dipilih: {o.persons.join(", ") || "-"}
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -242,14 +273,12 @@ export default function App() {
                         checked={o.persons.includes(p)}
                         onChange={(e) => {
                           let updated = [...o.persons]
-
                           if (e.target.checked) {
-                            updated.push(p)
+                            if (!updated.includes(p)) updated.push(p)
                           } else {
                             updated = updated.filter(x => x !== p)
                           }
-
-                          updateOrder(o.id, "persons", updated)
+                          updateOrder(i, "persons", updated)
                         }}
                       />
                       {p}
@@ -259,10 +288,7 @@ export default function App() {
 
               </div>
             ))}
-
-            <button className="btn-purple" onClick={addOrder}>
-              + Tambah Order
-            </button>
+            <button onClick={addOrder} className="btn-purple">+ Tambah Order</button>
           </Card>
 
         </div>
@@ -289,6 +315,18 @@ export default function App() {
                 <p>Total: <b>{formatRupiah(result.total)}</b></p>
                 <p>Yang bayar: <b>{paidBy}</b></p>
 
+                {Object.keys(detail).map((name, i) => (
+                  <div key={i} className="bg-gray-100 p-2 mt-2 rounded">
+                    <b>{name}</b><br />
+                    {detail[name].items.join(", ")}<br />
+                    <b>{formatRupiah(detail[name].total)}</b>
+                  </div>
+                ))}
+
+                <div className="mt-2 text-sm">
+                  Tax: {tax || 0}% | Service: {service || 0}%
+                </div>
+
                 <div className="mt-2">
                   {result.transfers.map((t, i) => (
                     <div key={i}>
@@ -299,7 +337,7 @@ export default function App() {
               </div>
 
               <button onClick={handleExport} className="w-full bg-green-600 text-white py-2 rounded">
-                Export 📸
+                Export ke Gambar 📸
               </button>
             </>
           )}
