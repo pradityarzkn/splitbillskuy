@@ -79,26 +79,26 @@ export default function App() {
     const menuMap = {}
 
     menu.forEach(m => {
-      if (m.name) {
-        menuMap[m.name] = Number(unformatNumber(m.price || "0"))
+      if (m.name && m.price) {
+        menuMap[m.name] = Number(unformatNumber(m.price))
       }
     })
 
     const result = {}
 
     orders.forEach(o => {
-      if (!o.persons || o.persons.length === 0 || !o.menu) return
+      if (!o.persons?.length || !o.menu) return
 
       const price = menuMap[o.menu] || 0
       const total = price * o.qty
-      const split = total / o.persons.length
+      const split = o.persons.length ? total / o.persons.length : 0
 
       o.persons.forEach(p => {
         if (!result[p]) {
           result[p] = { items: [], total: 0 }
         }
 
-        result[p].items.push(`${o.menu} x${o.qty} (share)`)
+        result[p].items.push(`${o.menu} x${o.qty}`)
         result[p].total += split
       })
     })
@@ -110,15 +110,16 @@ export default function App() {
 
   // ===== VALID =====
   const validPeople = people.filter(p => p && p.trim() !== "")
-  const validMenu = menu.filter(m => m.name && m.price)
+  const validMenu = menu.filter(m => m.name) // buat dropdown
+  const submitMenu = menu.filter(m => m.name && m.price) // buat API
   const validOrders = orders.filter(
-    o => o.persons && o.persons.length > 0 && o.menu && o.qty > 0
+    o => o.persons?.length > 0 && o.menu && o.qty > 0
   )
 
   // ===== SUBMIT =====
   const handleSubmit = async () => {
     if (!paidBy) return alert("Pilih siapa yang bayar")
-    if (validMenu.length === 0) return alert("Menu belum diisi")
+    if (submitMenu.length === 0) return alert("Harga menu belum lengkap")
     if (validOrders.length === 0) return alert("Order belum diisi")
 
     try {
@@ -130,7 +131,7 @@ export default function App() {
           paidBy,
           tax: Number(tax || 0),
           service: Number(service || 0),
-          menu: validMenu.map(m => ({
+          menu: submitMenu.map(m => ({
             name: m.name,
             price: Number(unformatNumber(m.price))
           })),
@@ -175,11 +176,7 @@ export default function App() {
         <div className="space-y-6">
 
           <Card title="Siapa yang bayar?">
-            <select
-              className="input"
-              value={paidBy}
-              onChange={(e) => setPaidBy(e.target.value)}
-            >
+            <select className="input" value={paidBy} onChange={(e) => setPaidBy(e.target.value)}>
               <option value="">-- pilih --</option>
               {validPeople.map((p, i) => (
                 <option key={i} value={p}>{p}</option>
@@ -234,7 +231,6 @@ export default function App() {
             </button>
           </Card>
 
-          {/* ORDERS */}
           <Card title="Orders">
             {orders.map((o, i) => (
               <div key={i} className="mb-3 bg-gray-50 p-3 rounded">
@@ -272,11 +268,8 @@ export default function App() {
                         onChange={(e) => {
                           let updated = o.persons || []
 
-                          if (e.target.checked) {
-                            updated = [...updated, p]
-                          } else {
-                            updated = updated.filter(x => x !== p)
-                          }
+                          if (e.target.checked) updated = [...updated, p]
+                          else updated = updated.filter(x => x !== p)
 
                           updateOrder(i, "persons", updated)
                         }}
@@ -301,28 +294,12 @@ export default function App() {
 
           <Card title="Tax & Service">
             <div className="flex gap-2">
-              <input
-                className="input w-1/2"
-                type="number"
-                placeholder="Tax (%)"
-                value={tax}
-                onChange={(e) => setTax(e.target.value)}
-              />
-              <input
-                className="input w-1/2"
-                type="number"
-                placeholder="Service (%)"
-                value={service}
-                onChange={(e) => setService(e.target.value)}
-              />
+              <input className="input w-1/2" placeholder="Tax (%)" value={tax} onChange={(e) => setTax(e.target.value)} />
+              <input className="input w-1/2" placeholder="Service (%)" value={service} onChange={(e) => setService(e.target.value)} />
             </div>
           </Card>
 
-          <button
-            onClick={handleSubmit}
-            disabled={loading || !paidBy}
-            className="w-full bg-black text-white py-3 rounded-xl"
-          >
+          <button onClick={handleSubmit} className="w-full bg-black text-white py-3 rounded-xl">
             {loading ? "Calculating..." : "Calculate 💸"}
           </button>
 
