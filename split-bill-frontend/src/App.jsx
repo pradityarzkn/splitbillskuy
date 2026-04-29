@@ -29,15 +29,18 @@ export default function App() {
 
   // ===== PEOPLE =====
   const addPerson = () => setPeople([...people, ""])
+
   const updatePerson = (i, val) => {
     setPeople(prev => prev.map((p, idx) => idx === i ? val : p))
   }
+
   const removePerson = (i) => {
     setPeople(prev => prev.filter((_, idx) => idx !== i))
   }
 
   // ===== MENU =====
   const addMenu = () => setMenu([...menu, { name: "", price: "" }])
+
   const updateMenu = (i, field, val) => {
     setMenu(prev =>
       prev.map((m, idx) =>
@@ -45,6 +48,7 @@ export default function App() {
       )
     )
   }
+
   const removeMenu = (i) => {
     setMenu(prev => prev.filter((_, idx) => idx !== i))
   }
@@ -66,7 +70,15 @@ export default function App() {
     setOrders(prev =>
       prev.map((o, idx) =>
         idx === i
-          ? { ...o, [field]: field === "qty" ? Number(val) : val }
+          ? {
+              ...o,
+              [field]:
+                field === "qty"
+                  ? Number(val)
+                  : typeof val === "string"
+                  ? val.trim()
+                  : val
+            }
           : o
       )
     )
@@ -78,7 +90,11 @@ export default function App() {
 
   // ===== VALID =====
   const validPeople = people.filter(p => p && p.trim() !== "")
-  const validMenu = menu.filter(m => m.name && m.name.trim() !== "")
+
+  const validMenu = menu
+    .map(m => ({ ...m, name: m.name.trim() }))
+    .filter(m => m.name !== "")
+
   const submitMenu = menu.filter(m => m.name && m.price)
 
   const validOrders = orders.filter(o =>
@@ -94,7 +110,7 @@ export default function App() {
 
     menu.forEach(m => {
       if (m.name && m.price) {
-        menuMap[m.name] = Number(unformatNumber(m.price))
+        menuMap[m.name.trim()] = Number(unformatNumber(m.price))
       }
     })
 
@@ -121,40 +137,28 @@ export default function App() {
   const handleSubmit = async () => {
     if (!paidBy) return alert("Pilih siapa yang bayar")
     if (submitMenu.length === 0) return alert("Harga menu belum lengkap")
-
-    if (validOrders.length === 0) {
-      console.log("ORDERS:", orders)
-      return alert("Order belum lengkap (menu / orang belum dipilih)")
-    }
+    if (validOrders.length === 0)
+      return alert("Order belum lengkap")
 
     try {
       setLoading(true)
 
-      const payload = {
-        paidBy,
-        tax: Number(tax || 0),
-        service: Number(service || 0),
-        menu: submitMenu.map(m => ({
-          name: m.name.trim(),
-          price: Number(unformatNumber(m.price))
-        })),
-        orders: validOrders.map(o => ({
-          menu: o.menu,
-          qty: o.qty,
-          persons: o.persons
-        }))
-      }
-
-      console.log("PAYLOAD:", payload)
-
       const res = await axios.post(
         "https://splitbillskuy-api.onrender.com/calculate",
-        payload
+        {
+          paidBy,
+          tax: Number(tax || 0),
+          service: Number(service || 0),
+          menu: submitMenu.map(m => ({
+            name: m.name.trim(),
+            price: Number(unformatNumber(m.price))
+          })),
+          orders: validOrders
+        }
       )
 
       setResult(res.data)
     } catch (err) {
-      console.log(err.response?.data)
       alert("Error: " + (err.response?.data?.error || err.message))
     } finally {
       setLoading(false)
@@ -241,13 +245,16 @@ export default function App() {
 
                 <div className="flex gap-2 mb-2">
                   <select
+                    key={validMenu.map(m => m.name).join("-")} // 🔥 FIX
                     className="input flex-1"
-                    value={o.menu}
+                    value={o.menu || ""}
                     onChange={(e) => updateOrder(i, "menu", e.target.value)}
                   >
                     <option value="">-- pilih menu --</option>
                     {validMenu.map((m, idx) => (
-                      <option key={idx} value={m.name}>{m.name}</option>
+                      <option key={idx} value={m.name}>
+                        {m.name}
+                      </option>
                     ))}
                   </select>
 
@@ -261,8 +268,8 @@ export default function App() {
                   <button onClick={() => removeOrder(i)} className="bg-red-500 text-white px-3 rounded">✕</button>
                 </div>
 
-                <div className="text-xs text-gray-500 mb-1">
-                  Dipilih: {o.persons.join(", ") || "-"}
+                <div className="text-xs text-blue-500 mb-1">
+                  Selected: {o.menu || "-"}
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -273,11 +280,8 @@ export default function App() {
                         checked={o.persons.includes(p)}
                         onChange={(e) => {
                           let updated = [...o.persons]
-                          if (e.target.checked) {
-                            if (!updated.includes(p)) updated.push(p)
-                          } else {
-                            updated = updated.filter(x => x !== p)
-                          }
+                          if (e.target.checked) updated.push(p)
+                          else updated = updated.filter(x => x !== p)
                           updateOrder(i, "persons", updated)
                         }}
                       />
