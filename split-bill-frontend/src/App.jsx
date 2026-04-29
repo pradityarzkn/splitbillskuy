@@ -46,7 +46,7 @@ export default function App() {
   const addMenu = () => setMenu([...menu, { name: "", price: "" }])
   const updateMenu = (i, field, val) => {
     const copy = [...menu]
-    copy[i][field] = val
+    copy[i] = { ...copy[i], [field]: val }
     setMenu(copy)
   }
   const removeMenu = (i) => {
@@ -58,6 +58,7 @@ export default function App() {
     setOrders([
       ...orders,
       {
+        id: Date.now(), // 🔥 FIX penting
         persons: [],
         menu: "",
         qty: 1
@@ -67,12 +68,9 @@ export default function App() {
   const updateOrder = (i, field, val) => {
     const copy = [...orders]
 
-    if (field === "persons") {
-      copy[i].persons = val
-    } else if (field === "qty") {
-      copy[i].qty = Number(val)
-    } else {
-      copy[i][field] = val
+    copy[i] = {
+      ...copy[i], // 🔥 biar ga ketimpa
+      [field]: field === "qty" ? Number(val) : val
     }
 
     setOrders(copy)
@@ -118,7 +116,7 @@ export default function App() {
 
   // ===== VALID =====
   const validPeople = people.filter(p => p && p.trim() !== "")
-  const validMenu = menu.filter(m => m.name) // dropdown
+  const validMenu = menu.filter(m => m.name)
   const submitMenu = menu.filter(m => m.name && m.price)
   const validOrders = orders.filter(
     o => o.persons?.length > 0 && o.menu && o.qty > 0
@@ -239,22 +237,19 @@ export default function App() {
             </button>
           </Card>
 
-          {/* ORDERS */}
           <Card title="Orders">
             {orders.map((o, i) => (
-              <div key={i} className="mb-3 bg-gray-50 p-3 rounded">
+              <div key={o.id} className="mb-3 bg-gray-50 p-3 rounded">
 
                 <div className="flex gap-2 mb-2">
                   <select
                     className="input flex-1"
-                    value={o.menu}
+                    value={o.menu || ""}
                     onChange={(e) => updateOrder(i, "menu", e.target.value)}
                   >
                     <option value="">-- pilih menu --</option>
                     {validMenu.map((m, idx) => (
-                      <option key={idx} value={m.name}>
-                        {m.name}
-                      </option>
+                      <option key={idx} value={m.name}>{m.name}</option>
                     ))}
                   </select>
 
@@ -270,9 +265,8 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* SELECTED PEOPLE */}
                 <div className="text-xs text-gray-500 mb-1">
-                  Dipilih: {o.persons.join(", ") || "-"}
+                  Dipilih: {o.persons?.join(", ") || "-"}
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -280,9 +274,9 @@ export default function App() {
                     <label key={idx} className="flex items-center gap-1 text-sm bg-white px-2 py-1 rounded border">
                       <input
                         type="checkbox"
-                        checked={o.persons.includes(p)}
+                        checked={o.persons?.includes(p) || false}
                         onChange={(e) => {
-                          let updated = [...o.persons]
+                          let updated = o.persons ? [...o.persons] : []
 
                           if (e.target.checked) {
                             if (!updated.includes(p)) updated.push(p)
