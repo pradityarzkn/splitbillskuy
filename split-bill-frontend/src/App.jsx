@@ -58,9 +58,9 @@ export default function App() {
     setOrders([
       ...orders,
       {
-        id: Date.now(), // 🔥 FIX penting
+        id: Date.now(),
         persons: [],
-        menu: "",
+        menuIndex: "", // 🔥 pake index, bukan name
         qty: 1
       }
     ])
@@ -69,7 +69,7 @@ export default function App() {
     const copy = [...orders]
 
     copy[i] = {
-      ...copy[i], // 🔥 biar ga ketimpa
+      ...copy[i],
       [field]: field === "qty" ? Number(val) : val
     }
 
@@ -80,31 +80,33 @@ export default function App() {
     setOrders(orders.filter((_, idx) => idx !== i))
   }
 
+  // ===== VALID =====
+  const validPeople = people.filter(p => p && p.trim() !== "")
+  const validMenu = menu.filter(m => m.name) // buat dropdown
+  const submitMenu = menu.filter(m => m.name && m.price)
+
+  const validOrders = orders.filter(
+    o => o.persons?.length > 0 && o.menuIndex !== "" && o.qty > 0
+  )
+
   // ===== DETAIL =====
   const getDetailPerPerson = () => {
-    const menuMap = {}
-
-    menu.forEach(m => {
-      if (m.name && m.price) {
-        menuMap[m.name] = Number(unformatNumber(m.price))
-      }
-    })
-
     const result = {}
 
     orders.forEach(o => {
-      if (!o.persons?.length || !o.menu) return
+      if (!o.persons?.length || o.menuIndex === "") return
 
-      const price = menuMap[o.menu] || 0
+      const selectedMenu = validMenu[o.menuIndex]
+      if (!selectedMenu) return
+
+      const price = Number(unformatNumber(selectedMenu.price || "0"))
       const total = price * o.qty
       const split = total / o.persons.length
 
       o.persons.forEach(p => {
-        if (!result[p]) {
-          result[p] = { items: [], total: 0 }
-        }
+        if (!result[p]) result[p] = { items: [], total: 0 }
 
-        result[p].items.push(`${o.menu} x${o.qty}`)
+        result[p].items.push(`${selectedMenu.name} x${o.qty}`)
         result[p].total += split
       })
     })
@@ -113,14 +115,6 @@ export default function App() {
   }
 
   const detail = useMemo(() => getDetailPerPerson(), [orders, menu])
-
-  // ===== VALID =====
-  const validPeople = people.filter(p => p && p.trim() !== "")
-  const validMenu = menu.filter(m => m.name)
-  const submitMenu = menu.filter(m => m.name && m.price)
-  const validOrders = orders.filter(
-    o => o.persons?.length > 0 && o.menu && o.qty > 0
-  )
 
   // ===== SUBMIT =====
   const handleSubmit = async () => {
@@ -141,7 +135,11 @@ export default function App() {
             name: m.name,
             price: Number(unformatNumber(m.price))
           })),
-          orders: validOrders
+          orders: validOrders.map(o => ({
+            menu: validMenu[o.menuIndex]?.name, // 🔥 convert index ke name
+            qty: o.qty,
+            sharedBy: o.persons // 🔥 sesuai backend
+          }))
         }
       )
 
@@ -244,12 +242,14 @@ export default function App() {
                 <div className="flex gap-2 mb-2">
                   <select
                     className="input flex-1"
-                    value={o.menu || ""}
-                    onChange={(e) => updateOrder(i, "menu", e.target.value)}
+                    value={o.menuIndex}
+                    onChange={(e) => updateOrder(i, "menuIndex", Number(e.target.value))}
                   >
                     <option value="">-- pilih menu --</option>
                     {validMenu.map((m, idx) => (
-                      <option key={idx} value={m.name}>{m.name}</option>
+                      <option key={idx} value={idx}>
+                        {m.name}
+                      </option>
                     ))}
                   </select>
 
@@ -266,7 +266,7 @@ export default function App() {
                 </div>
 
                 <div className="text-xs text-gray-500 mb-1">
-                  Dipilih: {o.persons?.join(", ") || "-"}
+                  Dipilih: {o.persons.join(", ") || "-"}
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -274,9 +274,9 @@ export default function App() {
                     <label key={idx} className="flex items-center gap-1 text-sm bg-white px-2 py-1 rounded border">
                       <input
                         type="checkbox"
-                        checked={o.persons?.includes(p) || false}
+                        checked={o.persons.includes(p)}
                         onChange={(e) => {
-                          let updated = o.persons ? [...o.persons] : []
+                          let updated = [...o.persons]
 
                           if (e.target.checked) {
                             if (!updated.includes(p)) updated.push(p)
